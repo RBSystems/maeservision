@@ -7,45 +7,192 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"sync"
 	"time"
 
 	pigo "github.com/esimov/pigo/core"
 )
 
-/*
-type circle struct {
-	p image.Point
-	r int
-}
+/*var wg = &sync.WaitGroup{}
 
-func (c *circle) ColorModel() color.Model {
-	return color.AlphaModel
-}
+func main() {
 
-func (c *circle) Bounds() image.Rectangle {
-	return image.Rect(c.p.X-c.r, c.p.Y-c.r, c.p.X+c.r, c.p.Y+c.r)
-}
+		fmt.Printf("Starting image check\n")
+		wg.Add(1)
+		go facecheck()
+		fmt.Printf("Started!\n")
+		wg.Wait()
+		fmt.Printf("Finished\n")
 
-func (c *circle) At(x, y int) color.Color {
-	xx, yy, rr := float64(x-c.p.X)+0.5, float64(y-c.p.Y)+0.5, float64(c.r)
-	if xx*xx+yy*yy < rr*rr {
-		return color.Alpha{255}
-	}
-	return color.Alpha{0}
 }
 */
 
-var wg = &sync.WaitGroup{}
+/* var haarCascadeFile = "haar.xml"
+var blue = color.RGBA{0, 0, 255, 0}
+var green = color.RGBA{0, 255, 0, 0}
+
+func toImage(m *gocv.Mat, imge image.Image) error {
+	typ := m.Type()
+	if typ != gocv.MatTypeCV8UC1 && typ != gocv.MatTypeCV8UC3 && typ !=
+		gocv.MatTypeCV8UC4 {
+		return errors.New("ToImage supports only MatType CV8UC1, CV8UC3 and CV8UC4")
+	}
+
+	width := m.Cols()
+	height := m.Rows()
+	step := m.Step()
+	data := m.ToBytes()
+	channels := m.Channels()
+
+	switch img := imge.(type) {
+	case *image.NRGBA:
+		c := color.NRGBA{
+			R: uint8(0),
+			G: uint8(0),
+			B: uint8(0),
+			A: uint8(255),
+		}
+		for y := 0; y < height; y++ {
+			for x := 0; x < step; x = x + channels {
+				c.B = uint8(data[y*step+x])
+				c.G = uint8(data[y*step+x+1])
+				c.R = uint8(data[y*step+x+2])
+				if channels == 4 {
+					c.A = uint8(data[y*step+x+3])
+				}
+				img.SetNRGBA(int(x/channels), y, c)
+			}
+		}
+
+	case *image.Gray:
+		c := color.Gray{Y: uint8(0)}
+		for y := 0; y < height; y++ {
+			for x := 0; x < width; x++ {
+				c.Y = uint8(data[y*step+x])
+				img.SetGray(x, y, c)
+			}
+		}
+	}
+	return nil
+}
+
+func grayscale(dst []uint8, src *image.NRGBA) []uint8 {
+	rows, cols := src.Bounds().Dx(), src.Bounds().Dy()
+	if dst == nil || len(dst) != rows*cols {
+		dst = make([]uint8, rows*cols)
+	}
+	for r := 0; r < rows; r++ {
+		for c := 0; c < cols; c++ {
+			dst[r*cols+c] = uint8(
+				0.299*float64(src.Pix[r*4*cols+4*c+0]) +
+					0.587*float64(src.Pix[r*4*cols+4*c+1]) +
+					0.114*float64(src.Pix[r*4*cols+4*c+2]),
+			)
+		}
+	}
+	return dst
+}
+
+func pigoSetup(width, height int) (*image.NRGBA, []uint8, *pigo.Pigo,
+	pigo.CascadeParams, pigo.ImageParams) {
+	goImg := image.NewNRGBA(image.Rect(0, 0, width, height))
+	grayGoImg := make([]uint8, width*height)
+	cParams := pigo.CascadeParams{
+		MinSize:     20,
+		MaxSize:     1000,
+		ShiftFactor: 0.1,
+		ScaleFactor: 1.1,
+	}
+	imgParams := pigo.ImageParams{
+		Pixels: grayGoImg,
+		Rows:   height,
+		Cols:   width,
+		Dim:    width,
+	}
+	classifier := pigo.NewPigo()
+
+	pigoCascadeFile, err = ioutil.ReadFile("/home/caleb/go/src/github.com/esimov/pigo/cascade/facefinder")
+	if err != nil {
+		log.Fatalf("Error reading the cascade file: %v", err)
+	}
+
+	var err error
+	if classifier, err = classifier.Unpack(pigoCascadeFile); err != nil {
+		log.Fatalf("Error reading the cascade file: %s", err)
+	}
+	return goImg, grayGoImg, classifier, cParams, imgParams
+}
 
 func main() {
-	fmt.Printf("Starting image check\n")
-	wg.Add(1)
-	go facecheck()
-	fmt.Printf("Started!\n")
-	wg.Wait()
-	fmt.Printf("Finished\n")
+	fmt.Printf("Starting code\n")
+	var err error
+	// open webcam
+	if webcam, err = gocv.VideoCaptureDevice(0); err != nil {
+		log.Fatal(err)
+	}
+	defer webcam.Close()
+	width := int(webcam.Get(gocv.VideoCaptureFrameWidth))
+	height := int(webcam.Get(gocv.VideoCaptureFrameHeight))
+
+	// open display window
+	window := gocv.NewWindow("Face Detect")
+	defer window.Close()
+
+	// prepare image matrix
+	img := gocv.NewMat()
+	defer img.Close()
+
+	// set up pigo
+	goImg, grayGoImg, pigoClass, cParams, imgParams := pigoSetup(width,
+		height)
+
+	// create classifier and load model
+	classifier := gocv.NewCascadeClassifier()
+	if !classifier.Load(haarCascadeFile) {
+		log.Fatalf("Error reading cascade file: %v\n", haarCascadeFile)
+	}
+	defer classifier.Close()
+
+	for {
+		if ok := webcam.Read(&img); !ok {
+			fmt.Printf("cannot read device %d\n", deviceID)
+			return
+		}
+		if img.Empty() {
+			continue
+		}
+		// use PIGO
+		if err = toImage(&img, goImg); err != nil {
+			log.Fatal(err)
+		}
+
+		grayGoImg = grayscale(grayGoImg, goImg)
+		imgParams.Pixels = grayGoImg
+		dets := pigoClass.RunCascade(imgParams, cParams)
+		dets = pigoClass.ClusterDetections(dets, 0.3)
+
+		for _, det := range dets {
+			if det.Q < 5 {
+				continue
+			}
+			x := det.Col - det.Scale/2
+			y := det.Row - det.Scale/2
+			r := image.Rect(x, y, x+det.Scale, y+det.Scale)
+			gocv.Rectangle(&img, r, green, 3)
+		}
+
+		// use GoCV
+		rects := classifier.DetectMultiScale(img)
+		for _, r := range rects {
+			gocv.Rectangle(&img, r, blue, 3)
+		}
+
+		window.IMShow(img)
+		if window.WaitKey(1) >= 0 {
+			break
+		}
+	}
 }
+*/
 
 func facecheck() {
 	defer wg.Done()
