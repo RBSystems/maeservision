@@ -8,12 +8,15 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"time"
 
 	"github.com/blackjack/webcam"
 	pigo "github.com/esimov/pigo/core"
 )
 
 const fmtYUYV = 0x56595559
+
+var push time.Time
 
 // FrameSizes .
 type FrameSizes []webcam.FrameSize
@@ -51,11 +54,12 @@ func StartCam() (*webcam.Webcam, error) {
 	}
 
 	fmt.Fprintf(os.Stderr, "Resulting image format: %s (%dx%d)\n", formatDesc[f], w, h)
+	push = time.Now()
 	return cam, nil
 
 }
 
-func usePigo(src *image.NRGBA) {
+func usePigo(src *image.NRGBA) []pigo.Detection {
 	cascadeFile, err := ioutil.ReadFile("/home/caleb/go/src/github.com/esimov/pigo/cascade/facefinder")
 	if err != nil {
 		log.Fatalf("Error reading the cascade file: %v", err)
@@ -78,9 +82,9 @@ func usePigo(src *image.NRGBA) {
 		},
 	}
 
-	pigo := pigo.NewPigo()
+	pigogo := pigo.NewPigo()
 
-	classifier, err := pigo.Unpack(cascadeFile)
+	classifier, err := pigogo.Unpack(cascadeFile)
 	if err != nil {
 		log.Fatalf("Error reading the cascade file: %s", err)
 	}
@@ -92,6 +96,7 @@ func usePigo(src *image.NRGBA) {
 	// The result contains quadruplets representing the row, column, scale and detection score.
 	dets := classifier.RunCascade(cParams, angle)
 	dets = classifier.ClusterDetections(dets, 0.2)
+	var toReturn []pigo.Detection
 	for _, det := range dets {
 		if det.Q < 5 {
 			continue
@@ -99,8 +104,10 @@ func usePigo(src *image.NRGBA) {
 		x := det.Col - det.Scale/2
 		y := det.Row - det.Scale/2
 		Rect(src, x, y, x+det.Scale, y+det.Scale)
+		toReturn = append(toReturn, det)
 		print("Q")
 	}
+	return toReturn
 }
 
 // ImgFromYUYV receives a byte array that is a YUYV frame from a webcam and processes
@@ -116,11 +123,15 @@ func ImgFromYUYV(frame []byte) error {
 	}
 
 	nimg := pigo.ImgToNRGBA(yuyv)
-	usePigo(nimg)
-	buf := new(bytes.Buffer)
-	err := jpeg.Encode(buf, nimg, nil)
-	print("*")
-	os.Stdout.Write(buf.Bytes())
-	os.Stdout.Sync()
-	return err
+	dets := usePigo(nimg)
+	if IsDelta(dets, push) {
+		buf := new(bytes.Buffer)
+		err := jpeg.Encode(buf, nimg, nil)
+		print("*")
+		os.Stdout.Write(buf.Bytes())
+		os.Stdout.Sync()
+		push = time.Now()
+		return err
+	}
+	return nil
 }
