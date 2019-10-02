@@ -112,7 +112,7 @@ func usePigo(src *image.NRGBA) []pigo.Detection {
 
 // ImgFromYUYV receives a byte array that is a YUYV frame from a webcam and processes
 // said frame using pigo. It will then encode that image to a jpeg and write it out
-func ImgFromYUYV(frame []byte) error {
+func ImgFromYUYV(frame []byte) ([]byte, error) {
 	yuyv := image.NewYCbCr(image.Rect(0, 0, 1600, 1200), image.YCbCrSubsampleRatio422)
 	for i := range yuyv.Cb {
 		ii := i * 4
@@ -127,11 +127,10 @@ func ImgFromYUYV(frame []byte) error {
 	if IsDelta(dets, push) {
 		buf := new(bytes.Buffer)
 		err := jpeg.Encode(buf, nimg, nil)
-		print("*")
-		os.Stdout.Write(buf.Bytes())
-		os.Stdout.Sync()
 		push = time.Now()
-		return err
+		return buf.Bytes(), err
+
 	}
-	return nil
+	var toReturn []byte
+	return toReturn, nil
 }

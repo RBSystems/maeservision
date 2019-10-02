@@ -12,14 +12,12 @@ var lastFaces []pigo.Detection
 // if it is different enough to be a delta picture
 func IsDelta(dets []pigo.Detection, last time.Time) bool {
 	if len(lastFaces) == 0 {
-		print("W")
 		lastFaces = dets
 		return false
 	}
 	if len(dets) > 0 && time.Since(last).Seconds() > 5 {
 		for _, det := range dets {
 			if det.Q >= 5 {
-				print("$")
 				return true
 			}
 		}
@@ -39,7 +37,6 @@ func IsDelta(dets []pigo.Detection, last time.Time) bool {
 			print("I")
 			if !checkIntersection(det, face) {
 				lastFaces = dets
-				print("#")
 				return true
 			}
 		}
@@ -52,12 +49,10 @@ func checkIntersection(a, b pigo.Detection) bool {
 		if a.Col+a.Scale > b.Col-b.Scale {
 			if a.Row < b.Row {
 				if a.Row+a.Scale >= b.Row-b.Scale {
-					print("1")
 					return true
 				}
 			} else {
 				if b.Row+b.Scale >= a.Row-a.Scale {
-					print("2")
 					return true
 				}
 			}
@@ -66,17 +61,14 @@ func checkIntersection(a, b pigo.Detection) bool {
 		if b.Col+b.Scale > a.Col-a.Scale {
 			if a.Row < b.Row {
 				if a.Row+a.Scale >= b.Row-b.Scale {
-					print("3")
 					return true
 				}
 			} else {
 				if b.Row+b.Scale >= a.Row-a.Scale {
-					print("4")
 					return true
 				}
 			}
 		}
 	}
-	print("5")
 	return false
 }
