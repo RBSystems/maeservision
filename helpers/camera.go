@@ -55,6 +55,7 @@ func StartCam() (*webcam.Webcam, error) {
 
 	fmt.Fprintf(os.Stderr, "Resulting image format: %s (%dx%d)\n", formatDesc[f], w, h)
 	push = time.Now()
+	cam.SetBufferCount(1)
 	return cam, nil
 
 }
@@ -105,7 +106,6 @@ func usePigo(src *image.NRGBA) []pigo.Detection {
 		y := det.Row - det.Scale/2
 		Rect(src, x, y, x+det.Scale, y+det.Scale)
 		toReturn = append(toReturn, det)
-		print("Q")
 	}
 	return toReturn
 }
@@ -124,13 +124,22 @@ func ImgFromYUYV(frame []byte) ([]byte, error) {
 
 	nimg := pigo.ImgToNRGBA(yuyv)
 	dets := usePigo(nimg)
+	//	usePigo(nimg)
 	if IsDelta(dets, push) {
 		buf := new(bytes.Buffer)
 		err := jpeg.Encode(buf, nimg, nil)
+		//print("*")
+		//ioutil.WriteFile("curr.jpg", buf.Bytes(), 0644)
+		/*	print("*")
+			os.Stdout.Write(buf.Bytes())
+			os.Stdout.Sync()
+		*/
+
 		push = time.Now()
 		return buf.Bytes(), err
 
 	}
 	var toReturn []byte
 	return toReturn, nil
+
 }
