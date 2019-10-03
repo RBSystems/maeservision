@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io/ioutil"
 	"os"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -9,6 +10,8 @@ import (
 	"github.com/aws/aws-sdk-go/service/rekognition"
 	"github.com/blackjack/webcam"
 	"github.com/byuoitav/maeservision/helpers"
+	"github.com/byuoitav/room-auth-ms/structs"
+	"github.com/byuoitav/wso2services/wso2requests"
 )
 
 func main() {
@@ -34,10 +37,11 @@ func main() {
 		fmt.Println("failed to create session,", err)
 		return
 	}
+
 	svc := rekognition.New(sess)
 	for {
+		fmt.Println("Picture time")
 		err = cam.WaitForFrame(timeout)
-
 		switch err.(type) {
 		case nil:
 		case *webcam.Timeout:
@@ -50,15 +54,14 @@ func main() {
 
 		frame, err := cam.ReadFrame()
 		if len(frame) != 0 {
+			//helpers.ImgFromYUYV(frame)
 			bytes, err := helpers.ImgFromYUYV(frame)
 			if err != nil {
 				fmt.Printf("Error with yuyv: %v\n", err)
 			} else if len(bytes) > 0 {
-				/*print("*")
-				os.Stdout.Write(bytes())
-				os.Stdout.Sync()
-				*/
-				fmt.Println("eeeeee")
+
+				fmt.Println("Face recognized")
+				ioutil.WriteFile("ForBraden.jpg", bytes, 0644)
 				image := &rekognition.Image{
 					Bytes: bytes,
 				}
@@ -71,20 +74,23 @@ func main() {
 
 				resp, err := svc.SearchFacesByImage(input)
 				if err != nil {
-					fmt.Println("failedd to serach faces: ", err)
-					return
+					fmt.Println("failed to search faces: ", err)
+				} else {
+					fmt.Printf("%d faces found\n", len(resp.FaceMatches))
+					for _, face := range resp.FaceMatches {
+						fmt.Println(*face.Face.ExternalImageId)
+						var output structs.WSO2CredentialResponse
+						err := wso2requests.MakeWSO2Request("GET", "https://api.byu.edu:443/byuapi/persons/v3/?credentials.credential_type=NET_ID&credentials.credential_id="+*face.Face.ExternalImageId, "", &output)
+						if err != nil {
+							fmt.Printf("Error when making WSO2 request %v", err)
+						} else {
+							fmt.Println(output.Values[0].Basic.PersonalEmailAddress.Value)
+						}
+					}
 				}
-				for _, face := range resp.FaceMatches {
-					fmt.Println(*face.Face.ExternalImageId)
-				}
-				/*				params := &rekognition.DetectFacesInput{
-									Image: image,
-									Attributes: []
-
-								}
-				*/
 
 			}
+
 		} else if err != nil {
 			fmt.Printf("Error reading frame: %v\n", err)
 			panic(err.Error())
