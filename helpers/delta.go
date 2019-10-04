@@ -34,7 +34,6 @@ func IsDelta(dets []pigo.Detection, last time.Time) bool {
 				//			print("F")
 				continue
 			}
-			print("I")
 			if !checkIntersection(det, face) {
 				lastFaces = dets
 				return true
