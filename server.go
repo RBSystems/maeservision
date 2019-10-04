@@ -30,7 +30,7 @@ func main() {
 	timeout := uint32(5) //5 seconds
 
 	for {
-		fmt.Println("Picture time")
+		//		fmt.Println("Picture time")
 		err = cam.WaitForFrame(timeout)
 		switch err.(type) {
 		case nil:
