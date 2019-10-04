@@ -1,61 +1,24 @@
 package main
 
 import (
-	"fmt"
-	"os"
-
-	"github.com/blackjack/webcam"
+	"github.com/byuoitav/common"
 	"github.com/byuoitav/maeservision/helpers"
+	"github.com/labstack/echo"
 )
 
 func main() {
-	byteChan := make(chan []byte, 3)
-	go helpers.RekognitionManager(byteChan)
-	cam, err := helpers.StartCam()
-	if err != nil {
-		fmt.Printf("error starting cam: %v\n", err)
-		os.Exit(1)
-	}
-	defer cam.Close()
+	go helpers.StartRekognition()
 
-	println("Press Enter to start streaming")
-	fmt.Scanf("\n")
-	err = cam.StartStreaming()
-	if err != nil {
-		fmt.Printf("Error starting stream: %v\n", err)
-		os.Exit(1)
-	}
+	port := ":15275"
+	router := common.NewRouter()
 
-	fmt.Println("starting")
-	timeout := uint32(5) //5 seconds
+	// websocket
+	router.GET("/websocket", func(context echo.Context) error {
+		helpers.ServeWebsocket(context.Response().Writer, context.Request())
+		return nil
+	})
 
-	for {
-		//		fmt.Println("Picture time")
-		err = cam.WaitForFrame(timeout)
-		switch err.(type) {
-		case nil:
-		case *webcam.Timeout:
-			fmt.Fprint(os.Stderr, err.Error())
-			continue
-		default:
-			fmt.Printf("Error waiting for frame: %v\n", err)
-			panic(err.Error())
-		}
+	router.Static("/", "index.html")
 
-		frame, err := cam.ReadFrame()
-		if len(frame) != 0 {
-			bytes, err := helpers.ImgFromYUYV(frame)
-			if err != nil {
-				fmt.Printf("Error with yuyv: %v\n", err)
-			} else if len(bytes) > 0 {
-				fmt.Println("Face found")
-				byteChan <- bytes
-			}
-
-		} else if err != nil {
-			fmt.Printf("Error reading frame: %v\n", err)
-			panic(err.Error())
-		}
-
-	}
+	router.Start(port)
 }

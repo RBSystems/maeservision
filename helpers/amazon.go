@@ -2,15 +2,22 @@ package helpers
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/rekognition"
+	"github.com/blackjack/webcam"
 	"github.com/byuoitav/room-auth-ms/structs"
 	"github.com/byuoitav/wso2services/wso2requests"
 )
 
 var svc *rekognition.Rekognition
+
+// RekognitionResult contains the name and face of the person recognized
+type RekognitionResult struct {
+	Name string
+}
 
 func init() {
 	sess, err := session.NewSession(&aws.Config{Region: aws.String("us-west-2")})
@@ -20,6 +27,59 @@ func init() {
 	}
 	svc = rekognition.New(sess)
 
+}
+
+// StartRekognition starts the webcam and begins passing images up to Amazon Rekognition
+func StartRekognition() {
+	byteChan := make(chan []byte, 3)
+	go rekognitionManager(byteChan)
+	cam, err := StartCam()
+	if err != nil {
+		fmt.Printf("error starting cam: %v\n", err)
+		os.Exit(1)
+	}
+	defer cam.Close()
+
+	println("Press Enter to start streaming")
+	fmt.Scanf("\n")
+	err = cam.StartStreaming()
+	if err != nil {
+		fmt.Printf("Error starting stream: %v\n", err)
+		os.Exit(1)
+	}
+
+	fmt.Println("starting")
+	timeout := uint32(5) //5 seconds
+
+	for {
+		//		fmt.Println("Picture time")
+		err = cam.WaitForFrame(timeout)
+		switch err.(type) {
+		case nil:
+		case *webcam.Timeout:
+			fmt.Fprint(os.Stderr, err.Error())
+			continue
+		default:
+			fmt.Printf("Error waiting for frame: %v\n", err)
+			panic(err.Error())
+		}
+
+		frame, err := cam.ReadFrame()
+		if len(frame) != 0 {
+			bytes, err := ImgFromYUYV(frame)
+			if err != nil {
+				fmt.Printf("Error with yuyv: %v\n", err)
+			} else if len(bytes) > 0 {
+				fmt.Println("Face found")
+				byteChan <- bytes
+			}
+
+		} else if err != nil {
+			fmt.Printf("Error reading frame: %v\n", err)
+			panic(err.Error())
+		}
+
+	}
 }
 
 // recognize returns the person who is recognized in the photo
@@ -61,13 +121,13 @@ func recognize(bytes []byte) structs.WSO2CredentialPerson {
 
 //RekognitionManager receives a channel of byte arrays (representing jpegs)
 //and then displays who the recognized faces are
-func RekognitionManager(byteChan chan ([]byte)) {
+func rekognitionManager(byteChan chan ([]byte)) {
 	for {
 		select {
 		case img := <-byteChan:
 			resp := recognize(img)
 			if resp.Basic.NetID.Value != "" {
-				fmt.Println(resp.Basic.FirstName.Value)
+				client.send <- RekognitionResult{Name: resp.Basic.FirstName.Value}
 			}
 		}
 	}
