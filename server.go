@@ -9,7 +9,7 @@ import (
 func main() {
 	go helpers.StartRekognition()
 
-	port := ":15275"
+	port := ":5275"
 	router := common.NewRouter()
 
 	// websocket

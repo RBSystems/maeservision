@@ -1,6 +1,7 @@
 package helpers
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 	"time"
@@ -27,7 +28,7 @@ const (
 var (
 	newline = []byte{'\n'}
 	space   = []byte{' '}
-	client  = Client{}
+	clients []*Client
 )
 
 var upgrader = websocket.Upgrader{
@@ -47,8 +48,8 @@ func ServeWebsocket(w http.ResponseWriter, r *http.Request) {
 		log.Printf("error: %v", err)
 		return
 	}
-
 	client := &Client{conn: conn, send: make(chan interface{}, 256)}
+	clients = append(clients, client)
 
 	go client.write()
 }
@@ -62,13 +63,14 @@ func (c *Client) write() {
 	for {
 		select {
 		case msg, ok := <-c.send:
+			fmt.Printf("Received a thing\n")
 			c.conn.SetWriteDeadline(time.Now().Add(writeWait))
 			if !ok {
 				c.conn.WriteMessage(websocket.CloseMessage, []byte{})
 				return
 			}
-			c.conn.WriteJSON(msg)
 
+			c.conn.WriteJSON(msg)
 		case <-ticker.C:
 			c.conn.SetWriteDeadline(time.Now().Add(writeWait))
 			if err := c.conn.WriteMessage(websocket.PingMessage, []byte{}); err != nil {

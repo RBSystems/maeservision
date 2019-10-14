@@ -4,16 +4,16 @@
 
     <script type="text/javascript">
         function startWebsocket() {
-            var ws = new WebSocket("ws://localhost:15275/websocket");
+            var ws = new WebSocket("ws://localhost:5275/websocket");
 
             ws.onmessage = function (evt) {
+                const data = JSON.parse(evt.data);
                 var nameArea = document.getElementById("nameArea");
-                nameArea.value = nameArea.value + "\n" + evt.data
-            };
+                nameArea.value = nameArea.value + "\n" + data.name;
 
-            ws.onclose = function() {
-                var nameArea = document.getElementById("nameArea");
-                nameArea.value = nameArea.value + "\n" + "Connection closed";
+                var imageArea = document.getElementById("imageArea");
+                imageArea.src = "data:image/jpeg;base64," + data.image;
+
             };
         }
     </script>
@@ -23,5 +23,6 @@
 <body>
     <button onclick="javascript:startWebsocket()">Subscribe</button>
     <textarea id="nameArea">Name Area</textarea>
+    <img id="imageArea" src="" />
 </body>
 </html>

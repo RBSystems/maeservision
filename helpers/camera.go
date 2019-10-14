@@ -124,7 +124,6 @@ func ImgFromYUYV(frame []byte) ([]byte, error) {
 
 	nimg := pigo.ImgToNRGBA(yuyv)
 	dets := usePigo(nimg)
-	//	usePigo(nimg)
 	if IsDelta(dets, push) {
 		buf := new(bytes.Buffer)
 		err := jpeg.Encode(buf, nimg, nil)
@@ -141,5 +140,4 @@ func ImgFromYUYV(frame []byte) ([]byte, error) {
 	}
 	var toReturn []byte
 	return toReturn, nil
-
 }

@@ -1,7 +1,9 @@
 package helpers
 
 import (
+	"encoding/base64"
 	"fmt"
+	"log"
 	"os"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -16,7 +18,8 @@ var svc *rekognition.Rekognition
 
 // RekognitionResult contains the name and face of the person recognized
 type RekognitionResult struct {
-	Name string
+	Name  string `json:"name"`
+	Image string `json:"image"`
 }
 
 func init() {
@@ -31,7 +34,7 @@ func init() {
 
 // StartRekognition starts the webcam and begins passing images up to Amazon Rekognition
 func StartRekognition() {
-	byteChan := make(chan []byte, 3)
+	byteChan := make(chan []byte)
 	go rekognitionManager(byteChan)
 	cam, err := StartCam()
 	if err != nil {
@@ -53,6 +56,7 @@ func StartRekognition() {
 
 	for {
 		//		fmt.Println("Picture time")
+		log.Println("Wait for frame")
 		err = cam.WaitForFrame(timeout)
 		switch err.(type) {
 		case nil:
@@ -63,7 +67,7 @@ func StartRekognition() {
 			fmt.Printf("Error waiting for frame: %v\n", err)
 			panic(err.Error())
 		}
-
+		log.Println("ReadFrame")
 		frame, err := cam.ReadFrame()
 		if len(frame) != 0 {
 			bytes, err := ImgFromYUYV(frame)
@@ -78,6 +82,7 @@ func StartRekognition() {
 			fmt.Printf("Error reading frame: %v\n", err)
 			panic(err.Error())
 		}
+		log.Println("Finished")
 
 	}
 }
@@ -125,10 +130,20 @@ func rekognitionManager(byteChan chan ([]byte)) {
 	for {
 		select {
 		case img := <-byteChan:
-			resp := recognize(img)
-			if resp.Basic.NetID.Value != "" {
-				client.send <- RekognitionResult{Name: resp.Basic.FirstName.Value}
+			image := base64.StdEncoding.EncodeToString(img)
+			for _, client := range clients {
+				client.send <- RekognitionResult{Name: "danny", Image: image}
 			}
+
+			/*
+				resp := recognize(img)
+				if resp.Basic.NetID.Value != "" {
+					image := base64.StdEncoding.EncodeToString(img)
+					for _, client := range clients {
+						client.send <- RekognitionResult{Name: resp.Basic.FirstName.Value, Image: image}
+					}
+				}
+			*/
 		}
 	}
 }
