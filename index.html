@@ -8,11 +8,13 @@
 
             ws.onmessage = function (evt) {
                 const data = JSON.parse(evt.data);
-                var nameArea = document.getElementById("nameArea");
-                nameArea.value = nameArea.value + "\n" + data.name;
-
-                var imageArea = document.getElementById("imageArea");
-                imageArea.src = "data:image/jpeg;base64," + data.image;
+                if (data.isLive === true){
+                    var liveArea = document.getElementById("liveArea");
+                    liveArea.src = "data:image/jpeg;base64," + data.image;
+                } else {
+                    var faceArea = document.getElementById("faceArea");
+                    faceArea.src = "data:image/jpeg;base64," + data.image;
+                }
 
             };
         }
@@ -20,9 +22,9 @@
 
     </head>
 
-<body>
-    <button onclick="javascript:startWebsocket()">Subscribe</button>
-    <textarea id="nameArea">Name Area</textarea>
-    <img id="imageArea" src="" />
-</body>
+    <body>
+        <button onclick="javascript:startWebsocket()">Subscribe</button>
+        <img id="liveArea" src="" />
+        <img id="faceArea" src="" />
+    </body>
 </html>

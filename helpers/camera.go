@@ -110,9 +110,10 @@ func usePigo(src *image.NRGBA) []pigo.Detection {
 	return toReturn
 }
 
-// ImgFromYUYV receives a byte array that is a YUYV frame from a webcam and processes
-// said frame using pigo. It will then encode that image to a jpeg and write it out
-func ImgFromYUYV(frame []byte) ([]byte, error) {
+// ImgHasFace receives a byte array that is a YUYV frame from a webcam and processes
+// said frame using pigo. It will then encode that image to a jpeg and return it and a boolean
+// as to whether it contains a face or not
+func ImgHasFace(frame []byte) (bool, []byte, error) {
 	yuyv := image.NewYCbCr(image.Rect(0, 0, 1600, 1200), image.YCbCrSubsampleRatio422)
 	for i := range yuyv.Cb {
 		ii := i * 4
@@ -122,22 +123,21 @@ func ImgFromYUYV(frame []byte) ([]byte, error) {
 		yuyv.Cr[i] = frame[ii+3]
 	}
 
+	hasFace := false
 	nimg := pigo.ImgToNRGBA(yuyv)
 	dets := usePigo(nimg)
-	if IsDelta(dets, push) {
-		buf := new(bytes.Buffer)
-		err := jpeg.Encode(buf, nimg, nil)
-		//print("*")
-		//ioutil.WriteFile("curr.jpg", buf.Bytes(), 0644)
-		/*	print("*")
-			os.Stdout.Write(buf.Bytes())
-			os.Stdout.Sync()
-		*/
 
-		push = time.Now()
-		return buf.Bytes(), err
+	//Get jpeg form of face
+	buf := new(bytes.Buffer)
+	err := jpeg.Encode(buf, nimg, nil)
 
+	if err != nil {
+		var toReturn []byte
+		return hasFace, toReturn, fmt.Errorf("Error encoding the jpeg: %v", err)
 	}
-	var toReturn []byte
-	return toReturn, nil
+	if IsDelta(dets, push) {
+		push = time.Now()
+		hasFace = true
+	}
+	return hasFace, buf.Bytes(), nil
 }
