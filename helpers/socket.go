@@ -1,7 +1,6 @@
 package helpers
 
 import (
-	"fmt"
 	"log"
 	"net/http"
 	"time"
@@ -63,7 +62,6 @@ func (c *Client) write() {
 	for {
 		select {
 		case msg, ok := <-c.send:
-			fmt.Printf("Received a thing\n")
 			c.conn.SetWriteDeadline(time.Now().Add(writeWait))
 			if !ok {
 				c.conn.WriteMessage(websocket.CloseMessage, []byte{})
