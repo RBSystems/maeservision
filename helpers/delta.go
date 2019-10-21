@@ -1,6 +1,7 @@
 package helpers
 
 import (
+	"fmt"
 	"time"
 
 	pigo "github.com/esimov/pigo/core"
@@ -11,36 +12,34 @@ var lastFaces []pigo.Detection
 // IsDelta checks an incoming picture position and the time and finds
 // if it is different enough to be a delta picture
 func IsDelta(dets []pigo.Detection, last time.Time) bool {
+	if len(dets) == 0 {
+		return false
+	}
 	if len(lastFaces) == 0 {
 		lastFaces = dets
-		return false
+		return true
 	}
-	if len(dets) > 0 && time.Since(last).Seconds() > 5 {
-		for _, det := range dets {
-			if det.Q >= 5 {
-				return true
-			}
-		}
-		return false
+	if time.Since(last).Seconds() > 5 {
+		fmt.Println("By time")
+		return true
 	}
-
+	intersection := false
 	for _, det := range dets {
-		if det.Q < 5 {
-			//		print("D")
-			continue
-		}
 		for _, face := range lastFaces {
-			if face.Q < 5 {
-				//			print("F")
-				continue
+			if checkIntersection(det, face) {
+				intersection = true
+				break
 			}
-			if !checkIntersection(det, face) {
-				lastFaces = dets
-				return true
-			}
+		}
+		if intersection {
+			break
 		}
 	}
-	return false
+	if intersection {
+		return false
+	}
+	lastFaces = dets
+	return true
 }
 
 func checkIntersection(a, b pigo.Detection) bool {
