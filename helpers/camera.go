@@ -9,7 +9,6 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
-	"time"
 
 	"github.com/blackjack/webcam"
 	pigo "github.com/esimov/pigo/core"
@@ -18,8 +17,6 @@ import (
 )
 
 const fmtYUYV = 0x56595559
-
-var push time.Time
 
 // FrameSizes .
 type FrameSizes []webcam.FrameSize
@@ -57,7 +54,6 @@ func StartCam() (*webcam.Webcam, error) {
 	}
 
 	fmt.Fprintf(os.Stderr, "Resulting image format: %s (%dx%d)\n", formatDesc[f], w, h)
-	push = time.Now()
 	cam.SetBufferCount(1)
 	return cam, nil
 
@@ -66,7 +62,6 @@ func StartCam() (*webcam.Webcam, error) {
 var classifier *pigo.Pigo
 
 func init() {
-	push = time.Now()
 	cascadeFile, err := ioutil.ReadFile("/home/caleb/go/src/github.com/esimov/pigo/cascade/facefinder")
 	if err != nil {
 		log.Fatalf("Error reading the cascade file: %v", err)
@@ -106,7 +101,7 @@ func usePigo(src *image.NRGBA) []pigo.Detection {
 	dets = classifier.ClusterDetections(dets, 0.2)
 	var toReturn []pigo.Detection
 	for _, det := range dets {
-		if det.Q < 12 {
+		if det.Q < 5 {
 			//			fmt.Printf("Lame face found: %v\n", det.Q)
 			continue
 		}
@@ -137,15 +132,15 @@ func FrameToJPEG(frame []byte) ([]byte, error) {
 	return buf.Bytes(), err
 }
 
-// ImgHasFace receives a byte array that is a YUYV frame from a webcam and processes
-// said frame using pigo. It will then encode that image to a jpeg and return it and a boolean
-// as to whether it contains a face or not
-func ImgHasFace(frame []byte) (bool, []byte, error) {
-	hasFace := false
+// DetectFaces receives a byte array that is a JPEG from a webcam and processes
+// said frame using pigo. It then returns an array of byte arrays containing the faces
+// in the frame
+func DetectFaces(frame []byte) ([][]byte, error) {
+	var faces [][]byte
 	buf := bytes.NewBuffer(frame)
 	img, err := jpeg.Decode(buf)
 	if err != nil {
-		return hasFace, []byte{}, err
+		return faces, err
 	}
 	nimg := pigo.ImgToNRGBA(img)
 	dets := usePigo(nimg)
@@ -153,11 +148,10 @@ func ImgHasFace(frame []byte) (bool, []byte, error) {
 		x := det.Col - det.Scale/2
 		y := det.Row - det.Scale/2
 		fmt.Printf("%v Q: %v left: %v --- top: %v --- right: %v --- bottom: %v\n", i, det.Q, x, y, x+det.Scale, y+det.Scale)
-
 	}
 	*/
 	if len(dets) > 0 {
-		if IsDelta(dets, push) {
+		if IsDelta(dets) {
 			for _, det := range dets {
 				x := det.Col - det.Scale/2
 				y := det.Row - det.Scale/2
@@ -186,19 +180,17 @@ func ImgHasFace(frame []byte) (bool, []byte, error) {
 					continue
 				}
 				fmt.Printf("Q: %v\n", det.Q)
+				faces = append(faces, buf.Bytes())
 				image := base64.StdEncoding.EncodeToString(buf.Bytes())
 
 				for _, client := range clients {
-					client.send <- RekognitionResult{Name: "", Image: image, Type: "cut"}
+					client.send <- RekognitionResult{Image: image, Type: "cut"}
 					fmt.Println("\nhere")
 				}
 			}
-
-			push = time.Now()
-			hasFace = true
 			fmt.Println("Is delta")
 		}
 	}
 
-	return hasFace, frame, nil
+	return faces, nil
 }

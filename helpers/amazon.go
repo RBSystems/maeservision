@@ -22,10 +22,13 @@ var svc *rekognition.Rekognition
 
 // RekognitionResult contains the name and face of the person recognized
 type RekognitionResult struct {
-	Name    string `json:"name"`
-	Image   string `json:"image"`
-	Type    string `json:"type"`
-	Glasses bool   `json:"glasses"`
+	FirstName     string    `json:"firstName"`
+	LastName      string    `json:"lastName"`
+	Image         string    `json:"image"`
+	Type          string    `json:"type"`
+	EmotionNames  []string  `json:"emotionNames"`
+	EmotionValues []float64 `json:"emotionValues"`
+	NetID         string    `json:"netID"`
 }
 
 type personFace struct {
@@ -172,21 +175,11 @@ func getFeatures(img []byte) []*rekognition.FaceDetail {
 //RekognitionManager receives a channel of byte arrays (representing jpegs)
 //and then displays who the recognized faces are
 func rekognitionManager(img []byte) {
-	/*func rekognitionManager(rekognitionChan chan ([]byte)) {
-	for {
-		select {
-		case img := <-rekognitionChan:
-	*/
 	matches := recognize(img)
 	faceDetails := getFeatures(img)
 
 	if len(matches) > 0 {
-		fmt.Printf("Matches found: %v\n", len(matches))
 		for _, match := range matches {
-			//TODO update recognize to also return bounding boxes
-			//TODO finish cutter
-			//TODO resize image after cutter
-			//TODO update html to properly show the faces (maybe an id to know when to reset?
 			//TODO update html to have a place to show these sweet face details
 			jpg, err := jpeg.Decode(bytes.NewReader(img))
 			if err != nil {
@@ -199,9 +192,6 @@ func rekognitionManager(img []byte) {
 			top := int(*faceDetails[0].BoundingBox.Top * imgHeight)
 			width := int(*faceDetails[0].BoundingBox.Width * imgWidth)
 			height := int(*faceDetails[0].BoundingBox.Height * imgHeight)
-			//fmt.Printf("Width: %v\n Height:%v\n", imgWidth, imgHeight)
-			//fmt.Printf("Ratios: \nLeft: %v\nTop: %v\nWidth: %v\nHeight: %v\n", *match.Face.Face.BoundingBox.Left, *match.Face.Face.BoundingBox.Top, *match.Face.Face.BoundingBox.Width, *match.Face.Face.BoundingBox.Height)
-			//fmt.Printf("BoundingBox: \nLeft: %v\nTop: %v\nWidth: %v\n Height: %v\n", left, top, width, height)
 
 			croppedImg, err := cutter.Crop(jpg, cutter.Config{
 				Width:  width,
@@ -222,9 +212,26 @@ func rekognitionManager(img []byte) {
 				continue
 			}
 			image := base64.StdEncoding.EncodeToString(buf.Bytes())
-			fmt.Printf("Found: %v\n", match.Person.Basic.FirstName.Value)
+			fmt.Printf("Found: %v %v\n", match.Person.Basic.FirstName.Value, match.Person.Basic.Surname.Value)
+			var emotionNames []string
+			var emotionValues []float64
+			for _, emotion := range faceDetails[0].Emotions {
+				if *emotion.Confidence < 5 {
+					continue
+				}
+				emotionNames = append(emotionNames, *emotion.Type)
+				emotionValues = append(emotionValues, *emotion.Confidence)
+			}
+			result := RekognitionResult{FirstName: match.Person.Basic.FirstName.Value,
+				LastName:      match.Person.Basic.Surname.Value,
+				Image:         image,
+				Type:          "recognized",
+				EmotionNames:  emotionNames,
+				EmotionValues: emotionValues,
+				NetID:         match.Person.Basic.NetID.Value,
+			}
 			for _, client := range clients {
-				client.send <- RekognitionResult{Name: match.Person.Basic.FirstName.Value, Image: image, Type: "recognized", Glasses: *faceDetails[0].Eyeglasses.Value}
+				client.send <- result
 			}
 		}
 
@@ -237,20 +244,21 @@ func liveManager(liveChan chan ([]byte)) {
 		case img := <-liveChan:
 			image := base64.StdEncoding.EncodeToString(img)
 			for _, client := range clients {
-				client.send <- RekognitionResult{Name: "", Image: image, Type: "live"}
+				client.send <- RekognitionResult{Image: image, Type: "live"}
 			}
 		}
 	}
 }
 
 func pigoManager(img []byte, rekognitionChan chan ([]byte)) {
-	hasFace, _, err := ImgHasFace(img)
+	faces, err := DetectFaces(img)
 	if err != nil {
 		fmt.Printf("Error with yuyv: %v\n", err)
 		return
 	}
-	if hasFace {
-		//rekognitionChan <- bytes
-		go rekognitionManager(img)
+	if len(faces) > 0 {
+		for _, face := range faces {
+			go rekognitionManager(face)
+		}
 	}
 }

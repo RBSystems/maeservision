@@ -1,31 +1,46 @@
 <!DOCTYPE HTML>
 <html>
     <head>
+        <link rel="stylesheet" type="text/css" href="styles.css">
 
-    <script type="text/javascript">
-        function startWebsocket() {
-            var ws = new WebSocket("ws://localhost:5275/websocket");
+        <script type="text/javascript">
+            function startWebsocket() {
+                var ws = new WebSocket("ws://localhost:5275/websocket");
 
-            ws.onmessage = function (evt) {
-                const data = JSON.parse(evt.data);
-                if (data.type === "live"){
-                    var liveArea = document.getElementById("liveArea");
-                    liveArea.src = "data:image/jpeg;base64," + data.image;
-                } else if (data.type === "recognized") {
-                    var imgArea = document.getElementById("imgArea");
-                    var img = document.createElement("IMG");
-                    img.src = "data:image/jpeg;base64," + data.image;
-                    imgArea.appendChild(img);
-                } else if (data.type === "cut"){
-                    var cutArea = document.getElementById("cutArea");
-                    var cut = document.createElement("IMG");
-                    cut.src = "data:image/jpeg;base64," + data.image;
-                    cutArea.appendChild(cut);
-                }
+                ws.onmessage = function (evt) {
+                    const data = JSON.parse(evt.data);
+                    if (data.type === "live"){
+                        var liveArea = document.getElementById("liveArea");
+                        liveArea.src = "data:image/jpeg;base64," + data.image;
+                    } else if (data.type === "cut"){
+                        var cutArea = document.getElementById("cutArea");
+                        var cut = document.createElement("IMG");
+                        cut.src = "data:image/jpeg;base64," + data.image;
+                        cutArea.appendChild(cut);
+                    } else if (data.type === "recognized") {
+                        var imgArea = document.getElementById("imgArea");
+                        var img = document.createElement("IMG");
+                        img.src = "data:image/jpeg;base64," + data.image;
+                        var emotes = document.createElement("DIV");
+                        for (var i = 0; i < data.emotionNames.length; i++){
+                            var emote = document.createElement("DIV");
+                            emote.innerText = data.emotionNames[i] + ": " + data.emotionValues[i] + "%"
+                            emotes.appendChild(emote);
+                        }
+                        var person = document.getElementById(data.netID);
+                        if (person == null){
+                            person = document.createElement("DIV");
+                            person.id = data.netID;
+                            imgArea.append(person);
+                        }
+                        person.innerHTML = "";
+                        person.appendChild(img);
+                        person.appendChild(emotes);
+                    }
 
-            };
-        }
-    </script>
+                };
+            }
+        </script>
 
     </head>
 
@@ -33,7 +48,7 @@
         <button onclick="javascript:startWebsocket()">Subscribe</button>
         <img id="liveArea" src="" />
         <div id= "cutArea">
-            </div>
+        </div>
         <div id="imgArea">
         </div>
     </body>
