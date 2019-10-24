@@ -18,6 +18,11 @@ import (
 
 const fmtYUYV = 0x56595559
 
+//const imgWidth = 1600
+//const imgHeight = 1200
+const imgWidth = 640
+const imgHeight = 480
+
 // FrameSizes .
 type FrameSizes []webcam.FrameSize
 
@@ -41,7 +46,7 @@ func StartCam() (*webcam.Webcam, error) {
 	var size webcam.FrameSize
 
 	for _, value := range frames {
-		if fmt.Sprintf("%s", value.GetString()) == "1600x1200" {
+		if fmt.Sprintf("%s", value.GetString()) == fmt.Sprintf("%vx%v", imgWidth, imgHeight) {
 			size = value
 			break
 		}
@@ -116,7 +121,7 @@ func usePigo(src *image.NRGBA) []pigo.Detection {
 
 // FrameToJPEG converts a camera frame into a JPEG image
 func FrameToJPEG(frame []byte) ([]byte, error) {
-	yuyv := image.NewYCbCr(image.Rect(0, 0, 1600, 1200), image.YCbCrSubsampleRatio422)
+	yuyv := image.NewYCbCr(image.Rect(0, 0, imgWidth, imgHeight), image.YCbCrSubsampleRatio422)
 	for i := range yuyv.Cb {
 		ii := i * 4
 		yuyv.Y[i*2] = frame[ii]

@@ -19,6 +19,7 @@ func main() {
 	})
 
 	router.Static("/", "index.html")
+	router.File("/style.css", "style.css")
 
 	router.Start(port)
 }

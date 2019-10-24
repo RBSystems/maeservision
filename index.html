@@ -1,7 +1,7 @@
 <!DOCTYPE HTML>
 <html>
     <head>
-        <link rel="stylesheet" type="text/css" href="styles.css">
+        <link href="style.css" rel="stylesheet" type="text/css"/>
 
         <script type="text/javascript">
             function startWebsocket() {
@@ -40,16 +40,27 @@
 
                 };
             }
+            window.onload = startWebsocket;
         </script>
 
     </head>
 
     <body>
-        <button onclick="javascript:startWebsocket()">Subscribe</button>
-        <img id="liveArea" src="" />
-        <div id= "cutArea">
-        </div>
-        <div id="imgArea">
+        <span id="title">
+            <p>Emotional Feedback</p>
+        </span>
+        <div class="row">
+            <div class="column">
+                <img id="liveArea" src="" />
+            </div>
+            <div class="column">
+                <div id= "cutArea">
+                </div>
+            </div>
+            <div class="column">
+                <div id="imgArea">
+                </div>
+            </div>
         </div>
     </body>
 </html>
