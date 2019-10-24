@@ -2,21 +2,21 @@ package helpers
 
 import (
 	"bytes"
+	"encoding/base64"
 	"fmt"
 	"image"
 	"image/jpeg"
 	"io/ioutil"
 	"log"
 	"os"
-	"time"
 
 	"github.com/blackjack/webcam"
 	pigo "github.com/esimov/pigo/core"
+	"github.com/nfnt/resize"
+	"github.com/oliamb/cutter"
 )
 
 const fmtYUYV = 0x56595559
-
-var push time.Time
 
 // FrameSizes .
 type FrameSizes []webcam.FrameSize
@@ -54,18 +54,27 @@ func StartCam() (*webcam.Webcam, error) {
 	}
 
 	fmt.Fprintf(os.Stderr, "Resulting image format: %s (%dx%d)\n", formatDesc[f], w, h)
-	push = time.Now()
 	cam.SetBufferCount(1)
 	return cam, nil
 
 }
 
-func usePigo(src *image.NRGBA) []pigo.Detection {
+var classifier *pigo.Pigo
+
+func init() {
 	cascadeFile, err := ioutil.ReadFile("/home/caleb/go/src/github.com/esimov/pigo/cascade/facefinder")
 	if err != nil {
 		log.Fatalf("Error reading the cascade file: %v", err)
 	}
 
+	pigogo := pigo.NewPigo()
+	classifier, err = pigogo.Unpack(cascadeFile)
+	if err != nil {
+		log.Fatalf("Error reading the cascade file: %s", err)
+	}
+}
+
+func usePigo(src *image.NRGBA) []pigo.Detection {
 	pixels := pigo.RgbToGrayscale(src)
 	cols, rows := src.Bounds().Max.X, src.Bounds().Max.Y
 
@@ -83,13 +92,6 @@ func usePigo(src *image.NRGBA) []pigo.Detection {
 		},
 	}
 
-	pigogo := pigo.NewPigo()
-
-	classifier, err := pigogo.Unpack(cascadeFile)
-	if err != nil {
-		log.Fatalf("Error reading the cascade file: %s", err)
-	}
-
 	angle := 0.0 // cascade rotation angle. 0.0 is 0 radians and 1.0 is 2*pi radians
 
 	//	drawSrc := &image.Uniform{color.RGBA{255, 0, 0, 255}}
@@ -100,19 +102,20 @@ func usePigo(src *image.NRGBA) []pigo.Detection {
 	var toReturn []pigo.Detection
 	for _, det := range dets {
 		if det.Q < 5 {
+			//			fmt.Printf("Lame face found: %v\n", det.Q)
 			continue
 		}
-		x := det.Col - det.Scale/2
-		y := det.Row - det.Scale/2
-		Rect(src, x, y, x+det.Scale, y+det.Scale)
+		//Rectangle drawing
+		//x := det.Col - det.Scale/2
+		//y := det.Row - det.Scale/2
+		//Rect(src, x, y, x+det.Scale, y+det.Scale)
 		toReturn = append(toReturn, det)
 	}
 	return toReturn
 }
 
-// ImgFromYUYV receives a byte array that is a YUYV frame from a webcam and processes
-// said frame using pigo. It will then encode that image to a jpeg and write it out
-func ImgFromYUYV(frame []byte) ([]byte, error) {
+// FrameToJPEG converts a camera frame into a JPEG image
+func FrameToJPEG(frame []byte) ([]byte, error) {
 	yuyv := image.NewYCbCr(image.Rect(0, 0, 1600, 1200), image.YCbCrSubsampleRatio422)
 	for i := range yuyv.Cb {
 		ii := i * 4
@@ -121,25 +124,73 @@ func ImgFromYUYV(frame []byte) ([]byte, error) {
 		yuyv.Cb[i] = frame[ii+1]
 		yuyv.Cr[i] = frame[ii+3]
 	}
-
 	nimg := pigo.ImgToNRGBA(yuyv)
-	dets := usePigo(nimg)
-	//	usePigo(nimg)
-	if IsDelta(dets, push) {
-		buf := new(bytes.Buffer)
-		err := jpeg.Encode(buf, nimg, nil)
-		//print("*")
-		//ioutil.WriteFile("curr.jpg", buf.Bytes(), 0644)
-		/*	print("*")
-			os.Stdout.Write(buf.Bytes())
-			os.Stdout.Sync()
-		*/
 
-		push = time.Now()
-		return buf.Bytes(), err
+	//Get jpeg form of face
+	var buf bytes.Buffer
+	err := jpeg.Encode(&buf, nimg, nil)
+	return buf.Bytes(), err
+}
 
+// DetectFaces receives a byte array that is a JPEG from a webcam and processes
+// said frame using pigo. It then returns an array of byte arrays containing the faces
+// in the frame
+func DetectFaces(frame []byte) ([][]byte, error) {
+	var faces [][]byte
+	buf := bytes.NewBuffer(frame)
+	img, err := jpeg.Decode(buf)
+	if err != nil {
+		return faces, err
 	}
-	var toReturn []byte
-	return toReturn, nil
+	nimg := pigo.ImgToNRGBA(img)
+	dets := usePigo(nimg)
+	/*for i, det := range dets {
+		x := det.Col - det.Scale/2
+		y := det.Row - det.Scale/2
+		fmt.Printf("%v Q: %v left: %v --- top: %v --- right: %v --- bottom: %v\n", i, det.Q, x, y, x+det.Scale, y+det.Scale)
+	}
+	*/
+	if len(dets) > 0 {
+		if IsDelta(dets) {
+			for _, det := range dets {
+				x := det.Col - det.Scale/2
+				y := det.Row - det.Scale/2
+				left := x
+				top := y
+				width := det.Scale
+				height := det.Scale
 
+				croppedImg, err := cutter.Crop(nimg, cutter.Config{
+					Width:  width,
+					Height: height,
+					Anchor: image.Point{left, top},
+					Mode:   cutter.TopLeft,
+				})
+				if err != nil {
+					fmt.Printf("error cropping image: %v", err)
+					continue
+				}
+
+				resized := resize.Resize(uint(width), uint(height), croppedImg, resize.NearestNeighbor)
+
+				buf := new(bytes.Buffer)
+				err = jpeg.Encode(buf, resized, nil)
+				if err != nil {
+					fmt.Printf("error encoding jpeg after resize: %v", err)
+					continue
+				}
+				fmt.Printf("Q: %v\n", det.Q)
+				faces = append(faces, buf.Bytes())
+				image := base64.StdEncoding.EncodeToString(buf.Bytes())
+
+				for _, client := range clients {
+					client.send <- RekognitionResult{Image: image, Type: "cut"}
+					fmt.Println("\nhere")
+				}
+			}
+			fmt.Println("Is delta")
+		}
+	}
+
+	return faces, nil
 }

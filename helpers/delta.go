@@ -1,6 +1,7 @@
 package helpers
 
 import (
+	"fmt"
 	"time"
 
 	pigo "github.com/esimov/pigo/core"
@@ -8,62 +9,75 @@ import (
 
 var lastFaces []pigo.Detection
 
+var last time.Time
+
+const deltaTimeout = 5
+
 // IsDelta checks an incoming picture position and the time and finds
 // if it is different enough to be a delta picture
-func IsDelta(dets []pigo.Detection, last time.Time) bool {
+func IsDelta(dets []pigo.Detection) bool {
+	if len(dets) == 0 {
+		return false
+	}
 	if len(lastFaces) == 0 {
 		lastFaces = dets
-		return false
+		last = time.Now()
+		return true
 	}
-	if len(dets) > 0 && time.Since(last).Seconds() > 5 {
-		for _, det := range dets {
-			if det.Q >= 5 {
-				return true
-			}
-		}
-		return false
+	if time.Since(last).Seconds() > deltaTimeout {
+		fmt.Println("By time")
+		last = time.Now()
+		return true
 	}
-
+	intersection := false
 	for _, det := range dets {
-		if det.Q < 5 {
-			//		print("D")
-			continue
-		}
 		for _, face := range lastFaces {
-			if face.Q < 5 {
-				//			print("F")
-				continue
+			if checkIntersection(det, face) {
+				intersection = true
+				break
 			}
-			if !checkIntersection(det, face) {
-				lastFaces = dets
-				return true
-			}
+		}
+		if intersection {
+			break
 		}
 	}
-	return false
+	if intersection {
+		return false
+	}
+	lastFaces = dets
+	last = time.Now()
+	return true
 }
 
 func checkIntersection(a, b pigo.Detection) bool {
-	if a.Col < b.Col {
-		if a.Col+a.Scale > b.Col-b.Scale {
-			if a.Row < b.Row {
-				if a.Row+a.Scale >= b.Row-b.Scale {
+	aLeft := a.Col - a.Scale/2
+	bLeft := b.Col - b.Scale/2
+	aWidth := a.Scale
+	bWidth := a.Scale
+	aTop := a.Row - a.Scale/2
+	bTop := b.Row - b.Scale/2
+	aHeight := a.Scale
+	bHeight := b.Scale
+	if aLeft < bLeft {
+		if aLeft+aWidth > bLeft {
+			if aTop < bTop {
+				if aTop+aHeight > bTop {
 					return true
 				}
 			} else {
-				if b.Row+b.Scale >= a.Row-a.Scale {
+				if bTop+bHeight > aTop {
 					return true
 				}
 			}
 		}
 	} else {
-		if b.Col+b.Scale > a.Col-a.Scale {
-			if a.Row < b.Row {
-				if a.Row+a.Scale >= b.Row-b.Scale {
+		if bLeft+bWidth > aLeft {
+			if aTop < bTop {
+				if aTop+aHeight >= bTop {
 					return true
 				}
 			} else {
-				if b.Row+b.Scale >= a.Row-a.Scale {
+				if bTop+bHeight >= aTop {
 					return true
 				}
 			}
