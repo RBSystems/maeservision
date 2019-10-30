@@ -4,7 +4,14 @@
         <link href="style.css" rel="stylesheet" type="text/css"/>
 
         <script type="text/javascript">
+            var peopleInRoom = {};
             function startWebsocket() {
+                var body = document.body,
+                    html = document.documentElement;
+
+                var height = Math.max ( body.scrollHeight, body.offsetHeight,
+                                        html.clientHeight, html.scrollHeight, html.offsetHeight );
+                
                 var ws = new WebSocket("ws://localhost:5275/websocket");
 
                 ws.onmessage = function (evt) {
@@ -12,53 +19,67 @@
                     if (data.type === "live"){
                         var liveArea = document.getElementById("liveArea");
                         liveArea.src = "data:image/jpeg;base64," + data.image;
-                    } else if (data.type === "cut"){
-                        var cutArea = document.getElementById("cutArea");
-                        var cut = document.createElement("IMG");
-                        cut.src = "data:image/jpeg;base64," + data.image;
-                        cutArea.appendChild(cut);
                     } else if (data.type === "recognized") {
+                        // Set time stamp
+                        peopleInRoom[data.netID] = Math.floor(Date.now() / 1000);
+                        
                         var imgArea = document.getElementById("imgArea");
+                        // Make image
                         var img = document.createElement("IMG");
                         img.src = "data:image/jpeg;base64," + data.image;
-                        var emotes = document.createElement("DIV");
+                        img.classList.add("cut");
+                        // Add name
+                        var name = document.createElement("DIV");
+                        name.innerText = data.firstName + " " + data.lastName;
+                        // Get emotions
+                        //var emotes = document.createElement("DIV");
                         for (var i = 0; i < data.emotionNames.length; i++){
                             var emote = document.createElement("DIV");
-                            emote.innerText = data.emotionNames[i] + ": " + data.emotionValues[i] + "%"
-                            emotes.appendChild(emote);
+                            emote.innerText = data.emotionNames[i] + ": " + parseInt(data.emotionValues[i] + 0.5) + "%"
+                            name.appendChild(emote);
                         }
                         var person = document.getElementById(data.netID);
                         if (person == null){
                             person = document.createElement("DIV");
+                            person.classList.add("person");
                             person.id = data.netID;
                             imgArea.append(person);
                         }
+                        /*var person = document.createElement("DIV");
+                        person.classList.add("person");
+                        imgArea.append(person);*/
                         person.innerHTML = "";
                         person.appendChild(img);
-                        person.appendChild(emotes);
+                        person.appendChild(name);
                     }
 
                 };
             }
+            setInterval(function checkRoom() {
+                for (var netID in peopleInRoom){
+                    if (Math.floor(Date.now() / 1000) - peopleInRoom[netID] > 10){
+//                        document.getElementById(netID).parentNode.removeChild(document.getElementById(netID));
+ //                       delete peopleInRoom[netID];
+                    }
+                } 
+            }, 10000);
             window.onload = startWebsocket;
         </script>
 
     </head>
 
     <body>
-        <span id="title">
-            <p>Emotional Feedback</p>
-        </span>
-        <div class="row">
-            <div class="column">
-                <img id="liveArea" src="" />
-            </div>
-            <div class="column">
-                <div id= "cutArea">
+        <div id="container">
+            <span id="title">
+                <p>Emotional Feedback</p>
+            </span>
+            <div class="row">
+                <div class="column1">
+                    <img id="liveArea" src="" />
                 </div>
-            </div>
-            <div class="column">
-                <div id="imgArea">
+                <div class="column2">
+                    <div id="imgArea">
+                    </div>
                 </div>
             </div>
         </div>

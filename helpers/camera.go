@@ -2,7 +2,6 @@ package helpers
 
 import (
 	"bytes"
-	"encoding/base64"
 	"fmt"
 	"image"
 	"image/jpeg"
@@ -20,6 +19,7 @@ const fmtYUYV = 0x56595559
 
 //const imgWidth = 1600
 //const imgHeight = 1200
+
 const imgWidth = 640
 const imgHeight = 480
 
@@ -184,14 +184,14 @@ func DetectFaces(frame []byte) ([][]byte, error) {
 					fmt.Printf("error encoding jpeg after resize: %v", err)
 					continue
 				}
-				fmt.Printf("Q: %v\n", det.Q)
 				faces = append(faces, buf.Bytes())
-				image := base64.StdEncoding.EncodeToString(buf.Bytes())
+				/*
+					image := base64.StdEncoding.EncodeToString(buf.Bytes())
 
-				for _, client := range clients {
-					client.send <- RekognitionResult{Image: image, Type: "cut"}
-					fmt.Println("\nhere")
-				}
+					for _, client := range clients {
+						client.send <- RekognitionResult{Image: image, Type: "cut"}
+					}
+				*/
 			}
 			fmt.Println("Is delta")
 		}
