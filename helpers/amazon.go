@@ -1,12 +1,10 @@
 package helpers
 
 import (
-	"bytes"
 	"encoding/base64"
 	"fmt"
-	"image"
-	"image/jpeg"
 	"os"
+	"sync"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
@@ -14,8 +12,6 @@ import (
 	"github.com/blackjack/webcam"
 	"github.com/byuoitav/room-auth-ms/structs"
 	"github.com/byuoitav/wso2services/wso2requests"
-	"github.com/nfnt/resize"
-	"github.com/oliamb/cutter"
 )
 
 var svc *rekognition.Rekognition
@@ -175,48 +171,33 @@ func getFeatures(img []byte) []*rekognition.FaceDetail {
 //RekognitionManager receives a channel of byte arrays (representing jpegs)
 //and then displays who the recognized faces are
 func rekognitionManager(img []byte) {
-	matches := recognize(img)
-	faceDetails := getFeatures(img)
+	var wg sync.WaitGroup
+	wg.Add(1)
+	var matches []personFace
+	go func() {
+		defer wg.Done()
+		matches = recognize(img)
+	}()
+	var faceDetails []*rekognition.FaceDetail
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		faceDetails = getFeatures(img)
+	}()
+	wg.Wait()
 
 	if len(matches) > 0 {
 		for _, match := range matches {
-			//TODO update html to have a place to show these sweet face details
-			jpg, err := jpeg.Decode(bytes.NewReader(img))
-			if err != nil {
-				fmt.Printf("error decoding image for cropping: %v\n", err)
+			fmt.Printf("Confidence: %v\n", *match.Face.Face.Confidence)
+			if *match.Face.Face.Confidence < 85 {
 				continue
 			}
-			imgWidth := float64(jpg.Bounds().Max.X - jpg.Bounds().Min.X)
-			imgHeight := float64(jpg.Bounds().Max.Y - jpg.Bounds().Min.Y)
-			left := int(*faceDetails[0].BoundingBox.Left * imgWidth)
-			top := int(*faceDetails[0].BoundingBox.Top * imgHeight)
-			width := int(*faceDetails[0].BoundingBox.Width * imgWidth)
-			height := int(*faceDetails[0].BoundingBox.Height * imgHeight)
-
-			croppedImg, err := cutter.Crop(jpg, cutter.Config{
-				Width:  width,
-				Height: height,
-				Anchor: image.Point{left, top},
-				Mode:   cutter.TopLeft,
-			})
-			if err != nil {
-				fmt.Printf("error cropping image: %v", err)
-				continue
-			}
-
-			resized := resize.Resize(uint(width), uint(height), croppedImg, resize.NearestNeighbor)
-			buf := new(bytes.Buffer)
-			err = jpeg.Encode(buf, resized, nil)
-			if err != nil {
-				fmt.Printf("error encoding jpeg after resize: %v", err)
-				continue
-			}
-			image := base64.StdEncoding.EncodeToString(buf.Bytes())
+			image := base64.StdEncoding.EncodeToString(img)
 			fmt.Printf("Found: %v %v\n", match.Person.Basic.FirstName.Value, match.Person.Basic.Surname.Value)
 			var emotionNames []string
 			var emotionValues []float64
 			for _, emotion := range faceDetails[0].Emotions {
-				if *emotion.Confidence < 5 {
+				if *emotion.Confidence < 10 {
 					continue
 				}
 				emotionNames = append(emotionNames, *emotion.Type)

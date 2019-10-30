@@ -1,16 +1,48 @@
-body {
+html, body {
     margin: 0;
+    height: 100%;
+}
+
+#container {
+    display: flex;
+    flex-flow: column;
+    height: 100%;
 }
 
 #liveArea {
-    left: 20px;
+    flex: 1 0 auto;
+    height: 100%;
 }
+
+#imgArea {
+    display: flex;
+    /*flex-direction: row;*/
+    flex-wrap: wrap;
+    min-width: 35.8%;
+    align-content: flex-start;
+}
+
+.person {
+    margin: 10px;
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-content: flex-start;
+    width: auto;
+    height: auto;
+}
+
+.cut {
+    object-fit: contain;
+}
+
 #title {
     display: flex;
     justify-content: center;
     background-color: #090077;
     padding: 0;
     margin: 0;
+    flex: 0 1 auto;
 }
 
 #title p {
@@ -23,8 +55,18 @@ body {
 
 .row {
     display: flex;
+    flex: 1 1 auto;
 }
 
-.column {
-    flex: 50%;
+.column1 {
+    display: flex;
+    width: 64.2%;
+}
+
+.column2 {
+    display: flex;
+    flex-flow: row wrap;
+    max-height: 100%;
+    width: 35.8%;
+    align-content: flex-start;
 }
