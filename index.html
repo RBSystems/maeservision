@@ -12,7 +12,7 @@
                 var height = Math.max ( body.scrollHeight, body.offsetHeight,
                                         html.clientHeight, html.scrollHeight, html.offsetHeight );
                 
-                var ws = new WebSocket("ws://localhost:5275/websocket");
+                var ws = new WebSocket("ws://10.13.34.9:5275/websocket");
 
                 ws.onmessage = function (evt) {
                     const data = JSON.parse(evt.data);
@@ -58,8 +58,8 @@
             setInterval(function checkRoom() {
                 for (var netID in peopleInRoom){
                     if (Math.floor(Date.now() / 1000) - peopleInRoom[netID] > 10){
-//                        document.getElementById(netID).parentNode.removeChild(document.getElementById(netID));
- //                       delete peopleInRoom[netID];
+                        document.getElementById(netID).parentNode.removeChild(document.getElementById(netID));
+                        delete peopleInRoom[netID];
                     }
                 } 
             }, 10000);
