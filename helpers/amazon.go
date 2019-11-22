@@ -3,8 +3,11 @@ package helpers
 import (
 	"encoding/base64"
 	"fmt"
+	"io/ioutil"
+	"net/http"
 	"os"
 	"sync"
+	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
@@ -41,16 +44,7 @@ func init() {
 	svc = rekognition.New(sess)
 }
 
-// StartRekognition starts the webcam and begins passing images up to Amazon Rekognition
-func StartRekognition() {
-	//Channel for rekognition recognized faces
-	rekognitionChan := make(chan []byte)
-	//Channel for all images to make up the live feed
-	liveChan := make(chan []byte)
-	// Start the managers
-	//go rekognitionManager(rekognitionChan)
-	go liveManager(liveChan)
-
+func runUSBCam(rekognitionChan, liveChan chan ([]byte)) {
 	// Start the Camera
 	cam, err := StartCam()
 	if err != nil {
@@ -58,6 +52,7 @@ func StartRekognition() {
 		os.Exit(1)
 	}
 	defer cam.Close()
+	time.Sleep(5 * time.Second)
 
 	//Start Streaming
 	//	println("Press Enter to start streaming")
@@ -67,7 +62,7 @@ func StartRekognition() {
 		fmt.Printf("Error starting stream: %v\n", err)
 		os.Exit(1)
 	}
-
+	time.Sleep(5 * time.Second)
 	fmt.Println("starting")
 	timeout := uint32(5) //5 seconds
 
@@ -99,6 +94,48 @@ func StartRekognition() {
 		}
 
 	}
+}
+
+func runWebCam(rekognitionChan, liveChan chan ([]byte)) {
+	c := http.Client{}
+	for {
+		resp, err := c.Get("http://10.13.34.10/jpg/image.jpg")
+		if err != nil {
+			fmt.Printf("error connecting to camera: %v\n", err)
+			continue
+		} else {
+			defer resp.Body.Close()
+			//buf := new(bytes.Buffer)
+			//buf.ReadFrom(resp.Body)
+			//fmt.Printf("%s", buf.Bytes())
+			//data := buf.String()
+
+			//	frame, err := base64.StdEncoding.DecodeString(data)
+			frame, err := ioutil.ReadAll(resp.Body)
+			if err != nil {
+				fmt.Printf("error reading body: %v\n", err)
+				continue
+			} else {
+				liveChan <- frame
+				go pigoManager(frame, rekognitionChan)
+			}
+
+		}
+	}
+}
+
+// StartRekognition starts the webcam and begins passing images up to Amazon Rekognition
+func StartRekognition() {
+	//Channel for rekognition recognized faces
+	rekognitionChan := make(chan []byte)
+	//Channel for all images to make up the live feed
+	liveChan := make(chan []byte)
+	// Start the managers
+	//go rekognitionManager(rekognitionChan)
+	go liveManager(liveChan)
+	//	runUSBCam(rekognitionChan, liveChan)
+	runWebCam(rekognitionChan, liveChan)
+
 }
 
 // recognize returns the person who is recognized in the photo

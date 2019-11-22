@@ -20,8 +20,14 @@ const fmtYUYV = 0x56595559
 //const imgWidth = 1600
 //const imgHeight = 1200
 
-const imgWidth = 640
-const imgHeight = 480
+//const imgWidth = 800
+//const imgHeight = 600
+
+//const imgWidth = 1280
+//const imgHeight = 720
+
+const imgWidth = 1920
+const imgHeight = 1080
 
 // FrameSizes .
 type FrameSizes []webcam.FrameSize
@@ -46,6 +52,7 @@ func StartCam() (*webcam.Webcam, error) {
 	var size webcam.FrameSize
 
 	for _, value := range frames {
+		//		fmt.Printf("Size: %+v\n", value)
 		if fmt.Sprintf("%s", value.GetString()) == fmt.Sprintf("%vx%v", imgWidth, imgHeight) {
 			size = value
 			break
@@ -67,7 +74,7 @@ func StartCam() (*webcam.Webcam, error) {
 var classifier *pigo.Pigo
 
 func init() {
-	cascadeFile, err := ioutil.ReadFile("/home/caleb/go/src/github.com/esimov/pigo/cascade/facefinder")
+	cascadeFile, err := ioutil.ReadFile("facefinder")
 	if err != nil {
 		log.Fatalf("Error reading the cascade file: %v", err)
 	}
