@@ -96,7 +96,7 @@ func runUSBCam(rekognitionChan, liveChan chan ([]byte)) {
 	}
 }
 
-func runWebCam(rekognitionChan, liveChan chan ([]byte)) {
+func runWebCam(rekognitionChan, liveChan chan ([]byte), deathChan chan (bool)) {
 	c := http.Client{}
 	for {
 		resp, err := c.Get("http://10.13.34.10/jpg/image.jpg")
@@ -121,6 +121,10 @@ func runWebCam(rekognitionChan, liveChan chan ([]byte)) {
 			}
 
 		}
+		select {
+		case <-deathChan:
+			return
+		}
 	}
 }
 
@@ -130,11 +134,24 @@ func StartRekognition() {
 	rekognitionChan := make(chan []byte)
 	//Channel for all images to make up the live feed
 	liveChan := make(chan []byte)
+	//Death channels
+	liveDeathChan := make(chan bool)
+	rekognitionDeathChan := make(chan bool)
 	// Start the managers
 	//go rekognitionManager(rekognitionChan)
-	go liveManager(liveChan)
+	go liveManager(liveChan, liveDeathChan)
 	//	runUSBCam(rekognitionChan, liveChan)
-	runWebCam(rekognitionChan, liveChan)
+	go runWebCam(rekognitionChan, liveChan, rekognitionDeathChan)
+	start := time.Now()
+	for {
+		//If it has been 5 minutes
+		if time.Since(start).Minutes() >= 5.0 {
+			liveDeathChan <- true
+			rekognitionDeathChan <- true
+			return
+		}
+		time.Sleep(5 * time.Second)
+	}
 
 }
 
@@ -256,7 +273,7 @@ func rekognitionManager(img []byte) {
 	}
 }
 
-func liveManager(liveChan chan ([]byte)) {
+func liveManager(liveChan chan ([]byte), deathChan chan (bool)) {
 	for {
 		select {
 		case img := <-liveChan:
@@ -264,6 +281,8 @@ func liveManager(liveChan chan ([]byte)) {
 			for _, client := range clients {
 				client.send <- RekognitionResult{Image: image, Type: "live"}
 			}
+		case <-deathChan:
+			return
 		}
 	}
 }

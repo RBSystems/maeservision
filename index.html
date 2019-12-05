@@ -12,7 +12,8 @@
                 var height = Math.max ( body.scrollHeight, body.offsetHeight,
                                         html.clientHeight, html.scrollHeight, html.offsetHeight );
                 
-                var ws = new WebSocket("ws://10.13.34.9:5275/websocket");
+                //var ws = new WebSocket("ws://10.13.34.9:5275/websocket");
+                var ws = new WebSocket("ws://localhost:5275/websocket");
 
                 ws.onmessage = function (evt) {
                     const data = JSON.parse(evt.data);
