@@ -64,17 +64,27 @@
                     }
                 } 
             }, 10000);
+            function enterCheck(event){
+                console.log("button check");
+                var keycode = (event.keyCode ? event.keyCode : event.which);
+                if (keycode == '13') {
+                    var req = new XMLHttpRequest();
+                    req.open("GET", "http://localhost:5275/start", true);
+                    req.send(null);
+                }
+            };
+
             window.onload = startWebsocket;
         </script>
 
     </head>
 
-    <body>
+    <body onkeypress="enterCheck(event)">
         <div id="container">
             <span id="title">
                 <p>Emotional Feedback</p>
             </span>
-            <div class="row">
+            <!--<div class="row">
                 <div class="column1">
                     <img id="liveArea" src="" />
                 </div>
@@ -83,6 +93,9 @@
                     </div>
                 </div>
             </div>
+            -->
+            <img id="liveArea" src="" />
+            <div id="imgArea"> </div>
         </div>
     </body>
 </html>

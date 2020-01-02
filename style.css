@@ -11,14 +11,14 @@ html, body {
 
 #liveArea {
     flex: 1 0 auto;
-    height: 100%;
+    width: 100%;
 }
 
 #imgArea {
     display: flex;
     /*flex-direction: row;*/
     flex-wrap: wrap;
-    min-width: 35.8%;
+    /*min-width: 35.8%;*/
     align-content: flex-start;
 }
 

@@ -99,31 +99,39 @@ func runUSBCam(rekognitionChan, liveChan chan ([]byte)) {
 func runWebCam(rekognitionChan, liveChan chan ([]byte), deathChan chan (bool)) {
 	c := http.Client{}
 	for {
-		resp, err := c.Get("http://10.13.34.10/jpg/image.jpg")
-		if err != nil {
-			fmt.Printf("error connecting to camera: %v\n", err)
-			continue
-		} else {
-			defer resp.Body.Close()
-			//buf := new(bytes.Buffer)
-			//buf.ReadFrom(resp.Body)
-			//fmt.Printf("%s", buf.Bytes())
-			//data := buf.String()
-
-			//	frame, err := base64.StdEncoding.DecodeString(data)
-			frame, err := ioutil.ReadAll(resp.Body)
-			if err != nil {
-				fmt.Printf("error reading body: %v\n", err)
-				continue
-			} else {
-				liveChan <- frame
-				go pigoManager(frame, rekognitionChan)
-			}
-
-		}
 		select {
 		case <-deathChan:
+			fmt.Println("webcam dying")
 			return
+		default:
+			resp, err := c.Get("http://10.5.34.48/jpg/image.jpg")
+			if err != nil {
+				fmt.Printf("error connecting to camera: %v\n", err)
+				continue
+			} else if resp.StatusCode/100 != 2 {
+				fmt.Printf("non-200 status code from camera: %v\n", resp.StatusCode)
+				continue
+			} else {
+				defer resp.Body.Close()
+				//buf := new(bytes.Buffer)
+				//buf.ReadFrom(resp.Body)
+				//fmt.Printf("%s", buf.Bytes())
+				//data := buf.String()
+
+				//	frame, err := base64.StdEncoding.DecodeString(data)
+				frame, err := ioutil.ReadAll(resp.Body)
+				if err != nil {
+					fmt.Printf("error reading body: %v\n", err)
+					continue
+				} else if len(frame) == 0 {
+					fmt.Println("error empty frame")
+					continue
+				} else {
+					liveChan <- frame
+					go pigoManager(frame, rekognitionChan)
+				}
+
+			}
 		}
 	}
 }
@@ -146,8 +154,9 @@ func StartRekognition() {
 	for {
 		//If it has been 5 minutes
 		if time.Since(start).Minutes() >= 5.0 {
-			liveDeathChan <- true
 			rekognitionDeathChan <- true
+			liveDeathChan <- true
+			fmt.Println("Time's up")
 			return
 		}
 		time.Sleep(5 * time.Second)
@@ -225,6 +234,7 @@ func getFeatures(img []byte) []*rekognition.FaceDetail {
 //RekognitionManager receives a channel of byte arrays (representing jpegs)
 //and then displays who the recognized faces are
 func rekognitionManager(img []byte) {
+	fmt.Println("sending pictures to amazon")
 	var wg sync.WaitGroup
 	wg.Add(1)
 	var matches []personFace
@@ -282,6 +292,7 @@ func liveManager(liveChan chan ([]byte), deathChan chan (bool)) {
 				client.send <- RekognitionResult{Image: image, Type: "live"}
 			}
 		case <-deathChan:
+			fmt.Println("LiveManager dying")
 			return
 		}
 	}
